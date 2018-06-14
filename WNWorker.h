@@ -2,79 +2,57 @@
 
 #include <atomic>
 #include <condition_variable>
-#include <future>
-#include <iostream>
 #include <memory>
 #include <mutex>
 #include <queue>
 #include <string>
 #include <thread>
-#include <thread>
-#include <assert.h>
 
 #include <glog/logging.h>
 
 namespace wn {
 
-typedef std::function<void()> Task;
+typedef std::function<void()> WorkerTask;
 
-class Worker {
+class WorkerQueue {
 public:
-    Worker(std::string workerName,
-           bool autoStart,
-           size_t queueSize = 100)
-        : thread_(0)
-        , keepGoing_(true)
-        , queueSize_(queueSize)
+    /** a worker queue that grows above maxQueueSize will start printing warning messages */
+    WorkerQueue(std::string workerName, size_t maxQueueSize = 100)
+        : keepGoing_(true)
+        , maxQueueSize_(maxQueueSize)
         , workerName_(std::move(workerName))
         , joined_(false)
     {
-        if (autoStart) {
-            this->start();
+        if (workerName_ == "") {
+            LOG(ERROR) << "WorkerQueue: you must name your worker";
         }
+        this->start();
     }
 
-    virtual ~Worker() {
-        if (key_me_) {
-            pthread_key_delete(key_me_);
-        }
-        this->join();
-    }
-
-    virtual void enqueueTask(Task task) {
+    /** enqueue the given task for **async** execution */
+    virtual void enqueueTask(WorkerTask task) {
         if (!task) {
             return;
         }
 
         std::unique_lock<std::mutex> lock(mutex_);
-        {
-            const size_t currentSize = taskQueue_.size();
-            if (taskQueue_.size() >= queueSize_) {
-                LOG(WARNING) << "WARN: " << this->name() << ", currentSize, "
-                             << currentSize << ", " << queueSize_;
-            }
-            taskQueue_.emplace(task);
+        const size_t currentSize = taskQueue_.size();
+        if (taskQueue_.size() >= maxQueueSize_) {
+            LOG(WARNING) << "WorkerQueue: WARN: " << this->name() << ", currentSize, "
+            << currentSize << ", " << maxQueueSize_;
         }
+        taskQueue_.emplace(task);
 
         condition_.notify_all();
     }
 
-    virtual void join() {
-        const bool alreadyJoined = joined_.exchange(true);
-        if (thread_) {
-            if (!alreadyJoined) {
-                this->stop();
-                pthread_join(thread_, NULL);
-            }
-            thread_ = 0;
-        }
-    }
-
+    /** get the worker queue name */
     const std::string& name() const {
         return workerName_;
     }
 
-    bool isCurrentWorker()
+    /** check if currently running on this worker queue (for assertion and debugging) */
+    bool isOnWorkerQueue()
     {
         bool ret = true;
         void* current = pthread_getspecific(key_me_);
@@ -82,55 +60,43 @@ public:
         return ret;
     }
 
-    void runloop() {
-        Worker::doRunLoop(this);
-    }
+    /** send a stop request to the thread and join the thread */
+    void join();
 
-    bool isKeepGoing() const {
-        return this->keepGoing_;
-    }
+    /** send a stop request to the thread
+        (stop the thread runloop) */
+    void stop();
 
-    void stop() {
-        this->enqueueTask([this]{
-            keepGoing_ = false;
-        });
+    virtual ~WorkerQueue() {
+        if (key_me_) {
+            pthread_key_delete(key_me_);
+        }
+        this->join();
     }
 
 protected:
-
-    void start() {
-        try {
-            pthread_create(
-                    &this->thread_,
-                    NULL,
-                    Worker::doRunLoop,
-                    (void*)this);
-        }
-        catch (std::exception& e) {
-            LOG(ERROR) << "failed to start: " << e.what();
-        }
-    }
-
-    void nameCurrentThread();
-    static void* doRunLoop(void* arg);
+    void start();
+    void markThread();
+    static void* workerRunloop(void* arg);
 
 protected:
-    pthread_t thread_;
+    std::unique_ptr<std::thread> thread_;
     bool keepGoing_;
-    size_t queueSize_;
+    size_t maxQueueSize_;
     std::string workerName_;
     std::mutex mutex_;
     std::condition_variable condition_;
-    std::queue<Task> taskQueue_;
+    std::queue<WorkerTask> taskQueue_;
     std::atomic_bool joined_;
     pthread_key_t key_me_;
 
-private: // non-copyable
-    Worker(const Worker& other);
-    Worker& operator=( const Worker& other);
+private: // not-copyable
+    WorkerQueue(const WorkerQueue& other);
+    WorkerQueue& operator=( const WorkerQueue& other);
 
 public:
     static void test();
 
 };
 }
+

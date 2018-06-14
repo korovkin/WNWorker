@@ -10,7 +10,7 @@ int main(int argc, char** argv)
     FLAGS_logtostderr = true;
 
     LOG(INFO) << "hello";
-    wn::Worker::test();
+    wn::WorkerQueue::test();
     LOG(INFO) << "EXIT_SUCCESS";
 
     return EXIT_SUCCESS;
