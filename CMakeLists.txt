@@ -29,7 +29,7 @@ target_include_directories(
 target_link_libraries(
   wnworker
   -lpthread
-  /usr/local/lib/libglog.a
-  /usr/local/lib/libgflags.a
+  -lglog
+  -lgflags
 )
 

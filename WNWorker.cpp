@@ -60,7 +60,7 @@ void WorkerQueue::markThread()
     int ret = 0;
     pthread_key_create(&key_me_, NULL);
     std::string shortName = workerName_.substr(0, 15);
-    ret = pthread_setname_np(shortName.c_str());
+    ret = pthread_setname_np(pthread_self(), shortName.c_str());
     if (ret) {
         LOG(ERROR) << "WorkerQueue: " << this->workerName_ << " failed to pthread_setname_np: " << strerror(ret);
     }

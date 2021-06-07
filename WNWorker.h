@@ -7,6 +7,7 @@
 #include <queue>
 #include <string>
 #include <thread>
+#include <functional>
 
 #include <glog/logging.h>
 
