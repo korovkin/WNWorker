@@ -23,7 +23,11 @@ public:
         , maxQueueSize_(maxQueueSize)
         , workerName_(std::move(workerName))
         , joined_(false)
+        , threadRunning_(false)
+        , key_me_(0)
     {
+        key_me_ = 0;
+        pthread_key_create(&key_me_, NULL);
         if (workerName_ == "") {
             LOG(ERROR) << "WorkerQueue: you must name your worker";
         }
@@ -56,14 +60,27 @@ public:
     bool isOnWorkerQueue()
     {
         bool ret = true;
-        LOG(INFO) << "isOnWorkerQueue: key_me_: " << key_me_;
         void* current = pthread_getspecific(key_me_);
         LOG(INFO) << "isOnWorkerQueue: "
+            << " key_me_ " << key_me_
             << " this: " << this
             << " current: " << current
             << " this: " << this;
         ret = (current == this);
         return ret;
+    }
+
+    /** check if the worker thread is running */
+    bool isWorkerQueueRunning() const {
+        const bool running = threadRunning_;
+        void* current = pthread_getspecific(key_me_);
+        LOG(INFO) << "isOnWorkerQueue: "
+            << " key_me_ " << key_me_
+            << " this: " << this
+            << " current: " << current
+            << " this: " << this
+            << " running: " << std::to_string(threadRunning_);
+        return running;
     }
 
     /** send a stop request to the thread and join the thread */
@@ -94,6 +111,7 @@ protected:
     std::condition_variable condition_;
     std::queue<WorkerTask> taskQueue_;
     std::atomic_bool joined_;
+    std::atomic_bool threadRunning_;
     pthread_key_t key_me_;
 
 private: // not-copyable

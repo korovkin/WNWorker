@@ -7,7 +7,7 @@ void* WorkerQueue::workerRunloop(void* s)
 {
     WorkerQueue* This = static_cast<WorkerQueue*>(s);
     This->markThread();
-
+    This->threadRunning_ = true;
     while (This->keepGoing_) {
         WorkerTask task;
 
@@ -39,7 +39,7 @@ void* WorkerQueue::workerRunloop(void* s)
             LOG(ERROR) << "WorkerQueue: " << This->workerName_ << ", task, exception, " << error.what();
         }
     }
-
+    This->threadRunning_ = false;
     return NULL;
 }
 
@@ -58,7 +58,6 @@ void WorkerQueue::start() {
 void WorkerQueue::markThread()
 {
     int ret = 0;
-    pthread_key_create(&key_me_, NULL);
     LOG(INFO) << "markThread: key_me_: " << key_me_;
     const std::string shortName = workerName_.substr(0, 15);
 #ifdef __APPLE__
@@ -78,7 +77,7 @@ void WorkerQueue::markThread()
 void WorkerQueue::test()
 {
     LOG(INFO) << "WorkerQueue: test: start";
-
+    LOG(INFO) << "WorkerQueue: test: 000";
     {
         wn::WorkerQueue w("test1");
 
@@ -91,31 +90,38 @@ void WorkerQueue::test()
             order += "a";
         };
         w.enqueueTask(std::move(task));
-
         // inline lambda (task):
         w.enqueueTask([&] {
             count++;
             order += "b";
         });
         w.join();
-
         // validate the count
         CHECK_EQ(count, 2);
         // validate the order
         CHECK_EQ(order, "ab");
     }
-
     LOG(INFO) << "WorkerQueue: test: 001";
-
     {
         wn::WorkerQueue w("test1");
 
+        // wait until the thread started and marked
+        std::atomic_int started(0);
+        w.enqueueTask([&] {  started++; });
+        while (started == 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        // have to be running by now:
+        CHECK(w.isWorkerQueueRunning() == true);
         // not on thread:
         CHECK(w.isOnWorkerQueue() == false);
-
         // on the worker thread:
-        w.enqueueTask([&] { CHECK(w.isOnWorkerQueue()); });
+        w.enqueueTask([&] {
+            CHECK(w.isOnWorkerQueue() == true);
+        });
         w.join();
+        // not running anymore
+        CHECK(w.isWorkerQueueRunning() == false);
     }
 
     LOG(INFO) << "WorkerQueue: test: 002";
@@ -125,8 +131,6 @@ void WorkerQueue::test()
         // empty worker queue
         w.join();
     }
-
-    LOG(INFO) << "WorkerQueue: test: 003";
 
     LOG(INFO) << "WorkerQueue: test: success";
 }
