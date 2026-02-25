@@ -1,0 +1,10 @@
+{
+    "clang-format.fallbackStyle": "Google",
+    "clang-format.style": "Google",
+    "includePath": [
+        "${workspaceRoot}",
+        "${workspaceRoot}/_build/_deps/**",
+        "${workspaceRoot}/_build_vscode/_deps/**",
+        "${workspaceRoot}/_build_agy/_deps/**"
+    ]
+}

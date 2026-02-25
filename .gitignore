@@ -28,4 +28,6 @@
 *.out
 *.app
 
-_build
+_build/
+_build_vscode/
+_build_agy/
