@@ -56,7 +56,12 @@ public:
     bool isOnWorkerQueue()
     {
         bool ret = true;
+        LOG(INFO) << "isOnWorkerQueue: key_me_: " << key_me_;
         void* current = pthread_getspecific(key_me_);
+        LOG(INFO) << "isOnWorkerQueue: "
+            << " this: " << this
+            << " current: " << current
+            << " this: " << this;
         ret = (current == this);
         return ret;
     }

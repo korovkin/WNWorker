@@ -59,8 +59,13 @@ void WorkerQueue::markThread()
 {
     int ret = 0;
     pthread_key_create(&key_me_, NULL);
-    std::string shortName = workerName_.substr(0, 15);
+    LOG(INFO) << "markThread: key_me_: " << key_me_;
+    const std::string shortName = workerName_.substr(0, 15);
+#ifdef __APPLE__
+    ret = pthread_setname_np(shortName.c_str());
+#else
     ret = pthread_setname_np(pthread_self(), shortName.c_str());
+#endif
     if (ret) {
         LOG(ERROR) << "WorkerQueue: " << this->workerName_ << " failed to pthread_setname_np: " << strerror(ret);
     }
@@ -100,6 +105,8 @@ void WorkerQueue::test()
         CHECK_EQ(order, "ab");
     }
 
+    LOG(INFO) << "WorkerQueue: test: 001";
+
     {
         wn::WorkerQueue w("test1");
 
@@ -111,11 +118,15 @@ void WorkerQueue::test()
         w.join();
     }
 
+    LOG(INFO) << "WorkerQueue: test: 002";
+
     {
         wn::WorkerQueue w("test1");
         // empty worker queue
         w.join();
     }
+
+    LOG(INFO) << "WorkerQueue: test: 003";
 
     LOG(INFO) << "WorkerQueue: test: success";
 }
